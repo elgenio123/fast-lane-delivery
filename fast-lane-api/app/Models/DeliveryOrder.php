@@ -5,6 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @OA\Schema(
+ *     schema="DeliveryOrder",
+ *     type="object",
+ *     title="Delivery Order Schema",
+ *     @OA\Property(property="id", type="integer", readOnly=true),
+ *     @OA\Property(property="customer_id", type="integer"),
+ *     @OA\Property(property="driver_id", type="integer", nullable=true),
+ *     @OA\Property(property="status", type="string", enum={"pending", "accepted", "in_transit", "delivered", "cancelled"}),
+ *     @OA\Property(property="pickup_address", type="string"),
+ *     @OA\Property(property="dropoff_address", type="string"),
+ *     @OA\Property(property="estimated_fare", type="number", format="float"),
+ *     @OA\Property(property="payment_method", type="string", enum={"mobile_money", "cash_on_delivery"}),
+ *     @OA\Property(property="created_at", type="string", format="date-time", readOnly=true),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", readOnly=true),
+ * )
+ */
 class DeliveryOrder extends Model
 {
     /** @use HasFactory<\Database\Factories\DeliveryOrderFactory> */

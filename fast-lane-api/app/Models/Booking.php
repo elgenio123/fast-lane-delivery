@@ -5,6 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @OA\Schema(
+ *     schema="Booking",
+ *     type="object",
+ *     @OA\Property(property="id", type="integer", readOnly=true, example=1),
+ *     @OA\Property(property="customer_id", type="integer", example=12),
+ *     @OA\Property(property="property_id", type="integer", example=3),
+ *     @OA\Property(property="check_in_date", type="string", format="date", example="2025-12-20"),
+ *     @OA\Property(property="check_out_date", type="string", format="date", example="2025-12-25"),
+ *     @OA\Property(property="total_price", type="number", format="float", example=250000),
+ *     @OA\Property(property="status", type="string", enum={"pending", "confirmed", "cancelled", "completed"}, example="pending"),
+ *     @OA\Property(property="payment_status", type="string", example="unpaid"),
+ *     @OA\Property(property="created_at", type="string", format="date-time", readOnly=true),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", readOnly=true),
+ * )
+ */
 class Booking extends Model
 {
     /** @use HasFactory<\Database\Factories\BookingFactory> */

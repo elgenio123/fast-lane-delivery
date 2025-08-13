@@ -10,19 +10,6 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 
 /**
- * @OA\Info(
- *     title="Fast Lane Delivery API",
- *     version="1.0.0",
- *     description="API for auth JWT and App end points"
- * )
- *
- * @OA\SecurityScheme(
- *     securityScheme="bearerAuth",
- *     type="http",
- *     scheme="bearer",
- *     bearerFormat="JWT",
- *     description="JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'"
- * )
  *
  * @OA\Schema(
  *     schema="User",

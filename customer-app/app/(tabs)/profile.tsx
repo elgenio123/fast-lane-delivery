@@ -55,7 +55,7 @@ export default function ProfileScreen() {
       icon: 'time-outline',
       title: 'Order History',
       subtitle: 'View your past orders and bookings',
-      onPress: () => router.push('/(tabs)/activity'),
+      onPress: () => router.push('/profile/order-history'),
     },
     {
       icon: 'help-circle-outline',

@@ -20,7 +20,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const handleOrderDelivery = () => {
-    router.push('/(tabs)/activity');
+    router.push('/delivery/set-locations');
   };
 
   const handleBookGuesthouse = () => {

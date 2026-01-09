@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
-import { useAuthStore } from '../stores/authStore'
+import { useAuthStore } from '../stores/authStore';
 // import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 export default function RootLayout() {

@@ -51,65 +51,50 @@ export default function OrderDetailsScreen() {
 
     // Get estimated fare once locations are set
     if (params.pickupLat && params.pickupLng && params.dropoffLat && params.dropoffLng) {
-      getEstimatedFare();
+      fetchEstimatedFare(
+        parseFloat(params.pickupLat as string),
+        parseFloat(params.pickupLng as string),
+        parseFloat(params.dropoffLat as string),
+        parseFloat(params.dropoffLng as string)
+      );
     }
   }, [params]);
 
-  const getEstimatedFare = async () => {
-    if (!pickupLocation || !dropoffLocation) return;
-
+  const fetchEstimatedFare = async (pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number) => {
     setIsLoadingFare(true);
     try {
       const fareResponse = await deliveryService.getEstimatedFare(
-        { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
-        { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }
+        { latitude: pickupLat, longitude: pickupLng },
+        { latitude: dropoffLat, longitude: dropoffLng }
       );
       setEstimatedFare(fareResponse.estimatedFare);
     } catch (error) {
       console.error('Error getting estimated fare:', error);
-      // Set a default fare for demo purposes
-      const distance = locationService.calculateDistance(
-        pickupLocation.latitude,
-        pickupLocation.longitude,
-        dropoffLocation.latitude,
-        dropoffLocation.longitude
-      );
-      setEstimatedFare(Math.round(distance * 1000)); // 1000 per km
+      const distance = locationService.calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
+      setEstimatedFare(Math.round(Math.max(distance * 1000, 1000)));
     } finally {
       setIsLoadingFare(false);
     }
   };
 
   const handlePlaceOrder = async () => {
-    // For demo purposes, always allow order placement
-    // Create mock data if any fields are missing
-    const finalPackageDescription = packageDescription.trim() || 'Demo Package';
-    const finalEstimatedFare = estimatedFare || 2500; // Default fare
+    const finalPackageDescription = packageDescription.trim() || 'Package delivery';
+
+    if (!pickupLocation || !dropoffLocation) {
+      Alert.alert('Error', 'Location data is missing. Please go back and set locations.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const orderData = {
-        pickupLocation: pickupLocation!,
-        dropoffLocation: dropoffLocation!,
+        pickupLocation: pickupLocation,
+        dropoffLocation: dropoffLocation,
         packageDescription: finalPackageDescription,
         paymentMethod,
       };
 
-      // For demo, create a mock response
-      const mockResponse = {
-        order: {
-          id: 'demo-order-' + Date.now(),
-          pickupLocation: pickupLocation!,
-          dropoffLocation: dropoffLocation!,
-          packageDescription: finalPackageDescription,
-          paymentMethod,
-          estimatedFare: finalEstimatedFare,
-          status: 'pending' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        message: 'Order created successfully'
-      };
+      const response = await deliveryService.createOrder(orderData);
       
       Alert.alert(
         'Order Created!',
@@ -118,24 +103,22 @@ export default function OrderDetailsScreen() {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate to finding driver screen
               router.push({
                 pathname: '/delivery/finding-driver',
-                params: { orderId: mockResponse.order.id },
+                params: { orderId: response.order.id },
               });
             },
           },
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create order. Please try again.');
+      Alert.alert('Error', error?.response?.data?.message || error.message || 'Failed to create order. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Always allow order placement for demo
-  const canPlaceOrder = true;
+  const canPlaceOrder = !!pickupLocation && !!dropoffLocation;
 
   return (
     <View style={styles.container}>
@@ -268,7 +251,7 @@ export default function OrderDetailsScreen() {
                 <View style={styles.fareRow}>
                   <Text style={styles.fareLabel}>Estimated Fare</Text>
                   <Text style={styles.fareAmount}>
-                    {estimatedFare ? `₦${estimatedFare.toLocaleString()}` : 'N/A'}
+                    {estimatedFare ? `${estimatedFare.toLocaleString()} XAF` : 'N/A'}
                   </Text>
                 </View>
                 

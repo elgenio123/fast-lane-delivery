@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('image')->nullable()->comment('Profile image path');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('type', enum_to_string_array(UserEnum::cases()))->default(UserEnum::CUSTOMER->value)
+            $table->string('type')->default('customer')
                 ->comment('User type: customer, driver, host, admin');
             $table->rememberToken();
             $table->timestamps();

@@ -46,20 +46,19 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (!validateForm()) return;
 
-    // setLoading(true);
-    // try {
-    //   const success = await login(email, password);
-    //   if (success) {
-    //     router.replace('/(tabs)');
-    //   } else {
-    //     Alert.alert('Error', 'Invalid credentials. Please try again.');
-    //   }
-    // } catch (error) {
-    //   Alert.alert('Error', 'An error occurred. Please try again.');
-    // } finally {
-    //   setLoading(false);
-    // }
-    router.replace('/(tabs)');
+    setLoading(true);
+    try {
+      const success = await login(email, password);
+      if (success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Error', 'Invalid credentials. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {

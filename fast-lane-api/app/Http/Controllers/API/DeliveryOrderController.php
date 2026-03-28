@@ -7,40 +7,28 @@ use App\Models\DeliveryOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-use App\Enums\DeliveryStatus;
 
 class DeliveryOrderController extends Controller
 {
     /**
-     * @OA\Post(
-     *      path="/api/delivery-orders",
-     *      summary="Create a new delivery order",
-     *      tags={"Delivery Orders"},
-     *      description="Allows a customer to create a new delivery request.",
-     *      security={{"bearerAuth":{}}},
-     *      @OA\RequestBody(
-     *          required=true,
-     *          @OA\JsonContent(
-     *              required={"pickup_address", "pickup_latitude", "pickup_longitude", "dropoff_address", "dropoff_latitude", "dropoff_longitude", "package_description", "payment_method"},
-     *              @OA\Property(property="pickup_address", type="string", example="123 Pickup St, Yaoundé"),
-     *              @OA\Property(property="pickup_latitude", type="number", format="float", example=3.866667),
-     *              @OA\Property(property="pickup_longitude", type="number", format="float", example=11.516667),
-     *              @OA\Property(property="dropoff_address", type="string", example="456 Dropoff Ave, Yaoundé"),
-     *              @OA\Property(property="dropoff_latitude", type="number", format="float", example=3.875555),
-     *              @OA\Property(property="dropoff_longitude", type="number", format="float", example=11.522222),
-     *              @OA\Property(property="package_description", type="string", example="A small document"),
-     *              @OA\Property(property="payment_method", type="string", enum={"mobile_money", "cash_on_delivery"}, example="mobile_money")
-     *          )
-     *      ),
-     *      @OA\Response(
-     *          response=201,
-     *          description="Order created successfully",
-     *          @OA\JsonContent(type="object", ref="#/components/schemas/DeliveryOrder")
-     *      ),
-     *      @OA\Response(response=400, description="Validation error"),
-     *      @OA\Response(response=401, description="Unauthenticated")
-     * )
+     * List all delivery orders for the authenticated user.
+     */
+    public function index()
+    {
+        $user = Auth::user();
+        $orders = DeliveryOrder::where('customer_id', $user->id)
+            ->with(['driver:id,name,phone_number'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $orders,
+        ]);
+    }
+
+    /**
+     * Create a new delivery order.
      */
     public function store(Request $request)
     {
@@ -52,85 +40,78 @@ class DeliveryOrderController extends Controller
             'dropoff_latitude' => 'required|numeric',
             'dropoff_longitude' => 'required|numeric',
             'package_description' => 'required|string|max:500',
-            'payment_method' => ['required', Rule::in(['mobile_money', 'cash_on_delivery'])],
+            'payment_method' => 'required|in:mobile_money,cash',
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
         $validatedData = $validator->validated();
         $validatedData['customer_id'] = Auth::id();
-        $validatedData['estimated_fare'] = $this->calculateFare($request->pickup_latitude, $request->pickup_longitude, $request->dropoff_latitude, $request->dropoff_longitude);
+        $validatedData['estimated_fare'] = $this->calculateFare(
+            $request->pickup_latitude,
+            $request->pickup_longitude,
+            $request->dropoff_latitude,
+            $request->dropoff_longitude
+        );
         $validatedData['status'] = 'pending';
+        $validatedData['payment_status'] = 'PENDING';
 
         $order = DeliveryOrder::create($validatedData);
+        $order->load('customer:id,name');
 
-        return response()->json(compact('order'), 201);
+        return response()->json([
+            'success' => true,
+            'data' => $order,
+            'message' => 'Order created successfully',
+        ], 201);
     }
 
     /**
-     * @OA\Get(
-     *      path="/api/delivery-orders/{order}",
-     *      summary="Get a specific delivery order",
-     *      tags={"Delivery Orders"},
-     *      description="Retrieves the details of a single delivery order. Accessible by the customer or the assigned driver.",
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="order",
-     *          in="path",
-     *          required=true,
-     *          description="ID of the delivery order",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(
-     *          response=200,
-     *          description="Successful operation",
-     *          @OA\JsonContent(type="object", ref="#/components/schemas/DeliveryOrder")
-     *      ),
-     *      @OA\Response(response=403, description="Forbidden"),
-     *      @OA\Response(response=404, description="Order not found")
-     * )
+     * Get a specific delivery order.
      */
     public function show(DeliveryOrder $order)
     {
         if (Auth::id() !== $order->customer_id && Auth::id() !== $order->driver_id) {
-            $message = 'You are not authorized to view this order.';
-            return response()->json(compact('message'), 403);
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $order->load(['customer:id,name', 'driver.driverProfile']);
-        return response()->json(compact('order'));
+        $order->load(['customer:id,name', 'driver:id,name,phone_number']);
+        return response()->json([
+            'success' => true,
+            'data' => $order,
+        ]);
     }
 
+    /**
+     * Cancel a delivery order.
+     */
+    public function cancel(DeliveryOrder $order)
+    {
+        if (Auth::id() !== $order->customer_id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        if (!in_array($order->status, ['pending', 'accepted'])) {
+            return response()->json(['success' => false, 'message' => 'Order cannot be cancelled in current state'], 400);
+        }
+
+        $order->update(['status' => 'cancelled']);
+        return response()->json([
+            'success' => true,
+            'data' => $order,
+            'message' => 'Order cancelled successfully',
+        ]);
+    }
 
     /**
-     * @OA\Post(
-     *      path="/api/delivery-orders/{order}/accept",
-     *      summary="Accept a delivery order",
-     *      tags={"Delivery Orders"},
-     *      description="Allows a driver to accept a pending delivery order.",
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="order",
-     *          in="path",
-     *          required=true,
-     *          description="ID of the delivery order to accept",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(
-     *          response=200,
-     *          description="Order accepted successfully",
-     *          @OA\JsonContent(type="object", ref="#/components/schemas/DeliveryOrder")
-     *      ),
-     *      @OA\Response(response=403, description="Forbidden/Order cannot be accepted")
-     * )
+     * Accept a delivery order (for drivers).
      */
     public function acceptOrder(DeliveryOrder $order)
     {
         if (Auth::user()->type !== 'driver' || $order->status !== 'pending') {
-            $message = 'This order cannot be accepted.';
-            return response()->json(compact('message'), 403);
+            return response()->json(['success' => false, 'message' => 'This order cannot be accepted'], 403);
         }
 
         $order->update([
@@ -139,51 +120,94 @@ class DeliveryOrderController extends Controller
         ]);
 
         $order->load('customer:id,name');
-        return response()->json(compact('order'));
+        return response()->json([
+            'success' => true,
+            'data' => $order,
+        ]);
     }
 
-    // NOTE: The rest of the controller methods (`updateStatus`, `calculateFare`, etc.) would follow the same refactoring pattern.
+    /**
+     * Update order status.
+     */
+    public function updateStatus(Request $request, DeliveryOrder $order)
+    {
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:pending,accepted,in_transit,delivered,cancelled',
+        ]);
 
-    /**
-     * Calculate estimated fare based on pickup and dropoff coordinates.
-     * This is a placeholder function. Implement your own fare calculation logic.
-     */
-    private function calculateFare($pickupLat, $pickupLng, $dropoffLat, $dropoffLng)
-    {
-        // Example logic: return a fixed fare for simplicity
-        return 1000; // Replace with actual fare calculation logic
-    }
-    /**
-     * @OA\Delete(
-     *      path="/api/delivery-orders/{order}",
-     *      summary="Cancel a delivery order",
-     *      tags={"Delivery Orders"},
-     *      description="Allows a customer to cancel their delivery order.",
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="order",
-     *          in="path",
-     *          required=true,
-     *          description="ID of the delivery order to cancel",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(
-     *          response=200,
-     *          description="Order cancelled successfully",
-     *          @OA\JsonContent(type="object", ref="#/components/schemas/DeliveryOrder")
-     *      ),
-     *      @OA\Response(response=403, description="Forbidden/Order cannot be cancelled"),
-     *      @OA\Response(response=404, description="Order not found")
-     * )
-     */
-    public function updateStatus(DeliveryOrder $order, $orderStatus)
-    {
-        if (Auth::id() !== $order->customer_id || $order->status !== DeliveryStatus::PENDING->value) {
-            $message = 'You are not authorized to change the status of this order.';
-            return response()->json(compact('message'), 403);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
-        $order->update(['status' => $orderStatus]);
-        return response()->json(compact('order'));
+        $order->update(['status' => $request->status]);
+        return response()->json([
+            'success' => true,
+            'data' => $order,
+        ]);
+    }
+
+    /**
+     * Estimate fare for a delivery.
+     */
+    public function estimateFare(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'pickup_latitude' => 'required|numeric',
+            'pickup_longitude' => 'required|numeric',
+            'dropoff_latitude' => 'required|numeric',
+            'dropoff_longitude' => 'required|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $fare = $this->calculateFare(
+            $request->pickup_latitude,
+            $request->pickup_longitude,
+            $request->dropoff_latitude,
+            $request->dropoff_longitude
+        );
+
+        $distance = $this->haversineDistance(
+            $request->pickup_latitude,
+            $request->pickup_longitude,
+            $request->dropoff_latitude,
+            $request->dropoff_longitude
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'estimatedFare' => $fare,
+                'distance' => round($distance, 2),
+                'duration' => round($distance * 3, 0),
+                'currency' => 'XAF',
+            ],
+        ]);
+    }
+
+    /**
+     * Calculate estimated fare using Haversine distance.
+     */
+    private function calculateFare($pickupLat, $pickupLng, $dropoffLat, $dropoffLng): float
+    {
+        $distance = $this->haversineDistance($pickupLat, $pickupLng, $dropoffLat, $dropoffLng);
+        $baseFare = 500;
+        $perKmRate = 1000;
+        return round(max($baseFare + ($distance * $perKmRate), 1000), 0);
+    }
+
+    /**
+     * Calculate Haversine distance in km.
+     */
+    private function haversineDistance($lat1, $lon1, $lat2, $lon2): float
+    {
+        $R = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $R * $c;
     }
 }

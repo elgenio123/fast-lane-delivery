@@ -92,11 +92,15 @@ class JWTAuthController extends Controller
             'email' => $request->get('email'),
             'password' => Hash::make($request->get('password')),
             'phone_number' => $request->get('phone_number'),
+            'type' => 'customer',
         ]);
 
         $token = JWTAuth::fromUser($user);
 
-        return response()->json(compact('user', 'token'), 201);
+        return response()->json([
+            'success' => true,
+            'data' => ['user' => $user, 'token' => $token],
+        ], 201);
     }
 
     /**
@@ -129,15 +133,18 @@ class JWTAuthController extends Controller
 
         try {
             if (! $token = JWTAuth::attempt($credentials)) {
-                return response()->json(['error' => 'Invalid credentials'], 401);
+                return response()->json(['success' => false, 'error' => 'Invalid credentials'], 401);
             }
 
             $user = auth()->user();
-            $token = JWTAuth::claims(['role' => $user->role])->fromUser($user);
+            $token = JWTAuth::claims(['role' => $user->type])->fromUser($user);
 
-            return response()->json(compact('user','token'));
+            return response()->json([
+                'success' => true,
+                'data' => ['user' => $user, 'token' => $token],
+            ]);
         } catch (JWTException $e) {
-            return response()->json(['error' => 'Could not create token'], 500);
+            return response()->json(['success' => false, 'error' => 'Could not create token'], 500);
         }
     }
 

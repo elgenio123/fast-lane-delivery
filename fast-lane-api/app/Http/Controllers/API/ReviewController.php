@@ -87,7 +87,11 @@ class ReviewController extends Controller
             'comment' => $validatedData['comment'] ?? null,
         ]);
 
-        return response()->json(compact('review'), 201);
+        return response()->json([
+            'success' => true,
+            'data' => $review,
+            'message' => 'Review submitted successfully.',
+        ], 201);
     }
     /**
      * @OA\Get(
@@ -147,6 +151,23 @@ class ReviewController extends Controller
 
         $reviews = $reviewable->reviews()->with('reviewer')->get();
 
-        return response()->json(compact('reviews'), 200);
+        return response()->json([
+            'success' => true,
+            'data' => $reviews,
+        ], 200);
+    }
+
+    /**
+     * Get reviews for a specific property by property ID.
+     */
+    public function propertyReviews($id)
+    {
+        $property = \App\Models\Property::findOrFail($id);
+        $reviews = $property->reviews()->with('reviewer:id,name')->latest()->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $reviews,
+        ]);
     }
 }

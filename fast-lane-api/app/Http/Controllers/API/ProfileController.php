@@ -32,7 +32,6 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
 
-        // Eager load relationships based on user type
         $relations = match ($user->type) {
             'driver' => ['driverProfile'],
             'host' => ['properties'],
@@ -41,7 +40,10 @@ class ProfileController extends Controller
 
         $user->load($relations);
 
-        return response()->json(compact('user'));
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+        ]);
     }
 
     /**
@@ -93,7 +95,10 @@ class ProfileController extends Controller
 
         $user->update($validator->validated());
 
-        $message = 'Profile updated successfully.';
-        return response()->json(compact('message', 'user'));
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+            'message' => 'Profile updated successfully.',
+        ]);
     }
 }

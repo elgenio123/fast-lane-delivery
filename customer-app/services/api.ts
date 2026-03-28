@@ -1,21 +1,46 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { ApiResponse } from '../types';
+
+// LAN IP for physical devices. 10.0.2.2 is the Android emulator alias for host localhost.
+const LAN_IP = '172.20.10.2';
+
+function getBaseURL(): string {
+  // Physical device (Expo Go) → use LAN IP
+  if (Constants.executionEnvironment === 'storeClient') {
+    return `http://${LAN_IP}:8000/api`;
+  }
+  // Android emulator → 10.0.2.2 maps to host machine's localhost
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8000/api';
+  }
+  // iOS simulator → localhost works directly
+  return 'http://localhost:8000/api';
+}
 
 class ApiService {
   private api: AxiosInstance;
-  private baseURL = 'https://api.fastlanedelivery.cm/api'; // Replace with your actual API URL
+  private baseURL = getBaseURL();
 
   constructor() {
     this.api = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
+      timeout: 15000,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
     });
 
     this.setupInterceptors();
+  }
+
+  // Allow changing base URL at runtime (for dev/prod switching)
+  setBaseURL(url: string) {
+    this.baseURL = url;
+    this.api.defaults.baseURL = url;
   }
 
   private setupInterceptors() {
@@ -39,7 +64,7 @@ class ApiService {
       async (error) => {
         if (error.response?.status === 401) {
           await AsyncStorage.removeItem('auth_token');
-          // Navigate to login screen
+          await AsyncStorage.removeItem('user_data');
         }
         return Promise.reject(error);
       }
@@ -59,12 +84,13 @@ class ApiService {
     password: string;
     password_confirmation: string;
   }): Promise<ApiResponse> {
-    const response = await this.api.post('/auth/register', userData);
-    return response.data;
-  }
-
-  async forgotPassword(email: string): Promise<ApiResponse> {
-    const response = await this.api.post('/auth/forgot-password', { email });
+    const response = await this.api.post('/auth/register', {
+      name: userData.name,
+      email: userData.email,
+      phone_number: userData.phone,
+      password: userData.password,
+      password_confirmation: userData.password_confirmation,
+    });
     return response.data;
   }
 
@@ -84,16 +110,24 @@ class ApiService {
     email: string;
     phone: string;
   }>): Promise<ApiResponse> {
-    const response = await this.api.put('/profile', userData);
+    const response = await this.api.put('/profile', {
+      name: userData.name,
+      email: userData.email,
+      phone_number: userData.phone,
+    });
     return response.data;
   }
 
   // Delivery endpoints
   async createDeliveryOrder(orderData: {
-    description: string;
-    pickupLocation: any;
-    dropoffLocation: any;
-    paymentMethod: string;
+    pickup_address: string;
+    pickup_latitude: number;
+    pickup_longitude: number;
+    dropoff_address: string;
+    dropoff_latitude: number;
+    dropoff_longitude: number;
+    package_description: string;
+    payment_method: string;
   }): Promise<ApiResponse> {
     const response = await this.api.post('/delivery-orders', orderData);
     return response.data;
@@ -111,6 +145,16 @@ class ApiService {
 
   async cancelDeliveryOrder(id: string): Promise<ApiResponse> {
     const response = await this.api.put(`/delivery-orders/${id}/cancel`);
+    return response.data;
+  }
+
+  async estimateFare(data: {
+    pickup_latitude: number;
+    pickup_longitude: number;
+    dropoff_latitude: number;
+    dropoff_longitude: number;
+  }): Promise<ApiResponse> {
+    const response = await this.api.post('/delivery-orders/estimate-fare', data);
     return response.data;
   }
 
@@ -132,10 +176,9 @@ class ApiService {
 
   // Booking endpoints
   async createBooking(bookingData: {
-    propertyId: string;
-    checkInDate: string;
-    checkOutDate: string;
-    guestCount: number;
+    property_id: string;
+    check_in_date: string;
+    check_out_date: string;
   }): Promise<ApiResponse> {
     const response = await this.api.post('/bookings', bookingData);
     return response.data;
@@ -153,7 +196,8 @@ class ApiService {
 
   // Review endpoints
   async createReview(reviewData: {
-    propertyId: string;
+    reviewable_id: string;
+    reviewable_type: string;
     rating: number;
     comment: string;
   }): Promise<ApiResponse> {

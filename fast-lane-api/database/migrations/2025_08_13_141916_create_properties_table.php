@@ -15,9 +15,13 @@ return new class extends Migration
         Schema::create('properties', function (Blueprint $table) {
             $table->id();
             $table->foreignId('host_id')->constrained('users')->onDelete('cascade');
-            $table->enum('type', enum_to_string_array(PropertyEnum::cases()))
-                ->default(PropertyEnum::GUESTHOUSE->value)
+            $table->string('type')->default('guesthouse')
                 ->comment('Property type: guesthouse, event_hall, apartment, restaurant');
+            $table->decimal('price_per_night', 10, 2)->default(0);
+            $table->json('amenities')->nullable();
+            $table->json('photos')->nullable();
+            $table->decimal('rating', 3, 2)->default(0);
+            $table->integer('review_count')->default(0);
             $table->string('name');
             $table->text('description');
             $table->string('address');

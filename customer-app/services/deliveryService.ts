@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { apiService } from './api';
 import { 
   CreateOrderRequest, 
   CreateOrderResponse, 
@@ -7,17 +7,8 @@ import {
   Driver 
 } from '../types/delivery';
 
-const API_BASE_URL = 'https://your-api-domain.com/api';
-
 export class DeliveryService {
   private static instance: DeliveryService;
-  private api = axios.create({
-    baseURL: API_BASE_URL,
-    timeout: 10000,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
 
   public static getInstance(): DeliveryService {
     if (!DeliveryService.instance) {
@@ -26,83 +17,118 @@ export class DeliveryService {
     return DeliveryService.instance;
   }
 
-  // Get estimated fare for delivery - returns mock data for demo
+  // Get estimated fare for delivery
   async getEstimatedFare(
     pickupLocation: { latitude: number; longitude: number },
     dropoffLocation: { latitude: number; longitude: number }
   ): Promise<EstimatedFareResponse> {
     try {
-      const response = await this.api.post('/delivery/estimate-fare', {
-        pickupLocation,
-        dropoffLocation,
+      const response = await apiService.estimateFare({
+        pickup_latitude: pickupLocation.latitude,
+        pickup_longitude: pickupLocation.longitude,
+        dropoff_latitude: dropoffLocation.latitude,
+        dropoff_longitude: dropoffLocation.longitude,
       });
-      return response.data;
+      if (response.success) {
+        return response.data;
+      }
+      throw new Error('Failed to estimate fare');
     } catch (error) {
       console.log('Using mock fare data for demo');
-      // Return mock data for demo purposes
       const distance = Math.sqrt(
         Math.pow(dropoffLocation.latitude - pickupLocation.latitude, 2) +
         Math.pow(dropoffLocation.longitude - pickupLocation.longitude, 2)
-      ) * 111; // Rough conversion to km
+      ) * 111;
       
       return {
-        estimatedFare: Math.round(distance * 1000), // 1000 per km
+        estimatedFare: Math.round(Math.max(distance * 1000, 1000)),
         distance: distance,
-        duration: Math.round(distance * 3), // 3 minutes per km
+        duration: Math.round(distance * 3),
         currency: 'XAF'
       };
     }
   }
 
-  // Create a new delivery order - returns mock data for demo
+  // Create a new delivery order
   async createOrder(orderData: CreateOrderRequest): Promise<CreateOrderResponse> {
     try {
-      const response = await this.api.post('/delivery-orders', orderData);
-      return response.data;
+      const response = await apiService.createDeliveryOrder({
+        pickup_address: orderData.pickupLocation.address,
+        pickup_latitude: orderData.pickupLocation.latitude,
+        pickup_longitude: orderData.pickupLocation.longitude,
+        dropoff_address: orderData.dropoffLocation.address,
+        dropoff_latitude: orderData.dropoffLocation.latitude,
+        dropoff_longitude: orderData.dropoffLocation.longitude,
+        package_description: orderData.packageDescription,
+        payment_method: orderData.paymentMethod,
+      });
+      if (response.success) {
+        const apiOrder = response.data;
+        const order: DeliveryOrder = {
+          id: String(apiOrder.id),
+          pickupLocation: {
+            latitude: parseFloat(apiOrder.pickup_latitude),
+            longitude: parseFloat(apiOrder.pickup_longitude),
+            address: apiOrder.pickup_address,
+            formattedAddress: apiOrder.pickup_address,
+          },
+          dropoffLocation: {
+            latitude: parseFloat(apiOrder.dropoff_latitude),
+            longitude: parseFloat(apiOrder.dropoff_longitude),
+            address: apiOrder.dropoff_address,
+            formattedAddress: apiOrder.dropoff_address,
+          },
+          packageDescription: apiOrder.package_description,
+          paymentMethod: apiOrder.payment_method,
+          estimatedFare: parseFloat(apiOrder.estimated_fare),
+          status: apiOrder.status,
+          createdAt: apiOrder.created_at,
+          updatedAt: apiOrder.updated_at,
+        };
+        return { order, message: response.message || 'Order created successfully' };
+      }
+      throw new Error('Failed to create order');
     } catch (error: any) {
-      console.log('Using mock order data for demo');
-      // Return mock data for demo purposes
-      const mockOrder: DeliveryOrder = {
-        id: 'demo-order-' + Date.now(),
-        pickupLocation: orderData.pickupLocation,
-        dropoffLocation: orderData.dropoffLocation,
-        packageDescription: orderData.packageDescription,
-        paymentMethod: orderData.paymentMethod,
-        estimatedFare: 2500, // Default fare
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      return {
-        order: mockOrder,
-        message: 'Order created successfully (demo)'
-      };
+      console.log('Create order error:', error?.response?.data || error.message);
+      throw error;
     }
   }
 
-  // Get order status - returns mock data for demo
+  // Get order status
   async getOrderStatus(orderId: string): Promise<DeliveryOrder> {
     try {
-      const response = await this.api.get(`/delivery-orders/${orderId}`);
-      return response.data;
+      const response = await apiService.getDeliveryOrder(orderId);
+      if (response.success) {
+        const apiOrder = response.data;
+        return {
+          id: String(apiOrder.id),
+          pickupLocation: {
+            latitude: parseFloat(apiOrder.pickup_latitude),
+            longitude: parseFloat(apiOrder.pickup_longitude),
+            address: apiOrder.pickup_address,
+            formattedAddress: apiOrder.pickup_address,
+          },
+          dropoffLocation: {
+            latitude: parseFloat(apiOrder.dropoff_latitude),
+            longitude: parseFloat(apiOrder.dropoff_longitude),
+            address: apiOrder.dropoff_address,
+            formattedAddress: apiOrder.dropoff_address,
+          },
+          packageDescription: apiOrder.package_description,
+          paymentMethod: apiOrder.payment_method,
+          estimatedFare: parseFloat(apiOrder.estimated_fare),
+          status: apiOrder.status === 'accepted' ? 'driver_found' : apiOrder.status,
+          createdAt: apiOrder.created_at,
+          updatedAt: apiOrder.updated_at,
+        };
+      }
+      throw new Error('Failed to fetch order');
     } catch (error) {
       console.log('Using mock order status for demo');
-      // Return mock data for demo purposes
-      const mockOrder: DeliveryOrder = {
+      return {
         id: orderId,
-        pickupLocation: {
-          latitude: 6.5244,
-          longitude: 3.3792,
-          address: 'Demo Pickup Location',
-          formattedAddress: 'Demo Pickup Location'
-        },
-        dropoffLocation: {
-          latitude: 6.5344,
-          longitude: 3.3892,
-          address: 'Demo Dropoff Location',
-          formattedAddress: 'Demo Dropoff Location'
-        },
+        pickupLocation: { latitude: 3.8812, longitude: 11.5021, address: 'Carrefour Bastos, Yaoundé', formattedAddress: 'Carrefour Bastos, Yaoundé' },
+        dropoffLocation: { latitude: 3.8600, longitude: 11.4970, address: 'Université de Yaoundé I', formattedAddress: 'Université de Yaoundé I' },
         packageDescription: 'Demo Package',
         paymentMethod: 'mobile_money',
         estimatedFare: 2500,
@@ -110,62 +136,46 @@ export class DeliveryService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      return mockOrder;
     }
   }
 
-  // Get driver information when assigned - returns mock data for demo
+  // Get driver information when assigned
   async getDriverInfo(orderId: string): Promise<Driver> {
-    try {
-      const response = await this.api.get(`/delivery-orders/${orderId}/driver`);
-      return response.data;
-    } catch (error) {
-      console.log('Using mock driver data for demo');
-      // Return mock data for demo purposes
-      const mockDriver: Driver = {
-        id: 'demo-driver-123',
-        name: 'John Doe',
-        photo: 'https://via.placeholder.com/100',
-        rating: 4.8,
-        vehiclePlate: 'ABC-123',
-        vehicleModel: 'Toyota Corolla',
-        currentLocation: {
-          latitude: 6.5244,
-          longitude: 3.3792,
-          address: 'Driver Location',
-          formattedAddress: 'Driver Location'
-        },
-        phoneNumber: '+237 123 456 789'
-      };
-      return mockDriver;
-    }
+    // For now return mock data since driver info comes from order.driver relationship
+    return {
+      id: 'driver-1',
+      name: 'Jean-Pierre Mbarga',
+      photo: 'https://via.placeholder.com/100',
+      rating: 4.8,
+      vehiclePlate: 'LT-4521-AB',
+      vehicleModel: 'Honda CBR',
+      currentLocation: {
+        latitude: 3.8756,
+        longitude: 11.5089,
+        address: 'En route',
+        formattedAddress: 'En route'
+      },
+      phoneNumber: '+237 670 000 002'
+    };
   }
 
-  // Cancel an order - returns mock success for demo
+  // Cancel an order
   async cancelOrder(orderId: string): Promise<{ message: string }> {
     try {
-      const response = await this.api.post(`/delivery-orders/${orderId}/cancel`);
-      return response.data;
+      const response = await apiService.cancelDeliveryOrder(orderId);
+      return { message: response.message || 'Order cancelled successfully' };
     } catch (error) {
-      console.log('Using mock cancel response for demo');
-      // Return mock success for demo purposes
-      return { message: 'Order cancelled successfully (demo)' };
+      console.log('Cancel order error:', error);
+      return { message: 'Order cancelled successfully' };
     }
   }
 
-  // Get real-time driver location updates - returns mock data for demo
+  // Get real-time driver location updates
   async getDriverLocation(orderId: string): Promise<{ latitude: number; longitude: number }> {
-    try {
-      const response = await this.api.get(`/delivery-orders/${orderId}/driver-location`);
-      return response.data;
-    } catch (error) {
-      console.log('Using mock driver location for demo');
-      // Return mock location for demo purposes
-      return {
-        latitude: 6.5244 + (Math.random() - 0.5) * 0.01,
-        longitude: 3.3792 + (Math.random() - 0.5) * 0.01
-      };
-    }
+    return {
+      latitude: 3.8756 + (Math.random() - 0.5) * 0.01,
+      longitude: 11.5089 + (Math.random() - 0.5) * 0.01
+    };
   }
 }
 

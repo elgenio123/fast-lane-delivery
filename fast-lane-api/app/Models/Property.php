@@ -41,6 +41,12 @@ class Property extends Model
         'quarter',
         'latitude',
         'longitude',
+        'price_per_night',
+        'amenities',
+        'photos',
+        'image',
+        'rating',
+        'review_count',
         'is_verified',
     ];
 

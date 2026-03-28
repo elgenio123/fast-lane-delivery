@@ -35,7 +35,10 @@ export default function ActivityScreen() {
   };
 
   const handleOrderPress = (orderId: string) => {
-    router.push(`/delivery/tracking/${orderId}`);
+    router.push({
+      pathname: '/delivery/live-tracking',
+      params: { orderId },
+    });
   };
 
   const handleBookingPress = (bookingId: string) => {

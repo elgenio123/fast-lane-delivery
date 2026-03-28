@@ -81,6 +81,14 @@ export class LocationService {
     return R * c;
   }
 
+  // Format distance for display
+  formatDistance(distanceKm: number): string {
+    if (distanceKm < 1) {
+      return `${Math.round(distanceKm * 1000)} m`;
+    }
+    return `${distanceKm.toFixed(1)} km`;
+  }
+
   // Simplified - no watching
   async watchLocation(callback: (location: { latitude: number; longitude: number }) => void): Promise<() => void> {
     // Return a no-op function for demo

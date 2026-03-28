@@ -29,15 +29,35 @@ class PropertyController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Property::query()->where('is_verified', false);
+        $query = Property::query();
 
-        // if ($request->has('quarter')) {
-        //     $query->where('quarter', 'like', '%' . $request->quarter . '%');
-        // }
+        if ($request->has('quarter')) {
+            $query->where('quarter', 'like', '%' . $request->quarter . '%');
+        }
 
-        $properties = $query->with('host:id,name')->paginate(15);
+        if ($request->has('minPrice')) {
+            $query->where('price_per_night', '>=', $request->minPrice);
+        }
 
-        return response()->json($properties);
+        if ($request->has('maxPrice')) {
+            $query->where('price_per_night', '<=', $request->maxPrice);
+        }
+
+        if ($request->has('minRating')) {
+            $query->where('rating', '>=', $request->minRating);
+        }
+
+        $properties = $query->with('host:id,name')->latest()->paginate(15);
+
+        return response()->json([
+            'success' => true,
+            'data' => $properties->items(),
+            'meta' => [
+                'current_page' => $properties->currentPage(),
+                'last_page' => $properties->lastPage(),
+                'total' => $properties->total(),
+            ],
+        ]);
     }
 
     /**
@@ -96,7 +116,11 @@ class PropertyController extends Controller
 
         $property = Auth::user()->properties()->create($validator->validated());
 
-        return response()->json(compact('property'), 201);
+        return response()->json([
+            'success' => true,
+            'data' => $property,
+            'message' => 'Property created successfully.',
+        ], 201);
     }
 
     // NOTE: The rest of the controller methods (`show`, `update`, etc.) would follow the same refactoring pattern.
@@ -126,8 +150,11 @@ class PropertyController extends Controller
      */
     public function show($id)
     {
-        $property = Property::with('host:id,name')->findOrFail($id);
-        return response()->json(compact('property'));
+        $property = Property::with(['host:id,name', 'reviews.reviewer:id,name'])->findOrFail($id);
+        return response()->json([
+            'success' => true,
+            'data' => $property,
+        ]);
     }
     /**
      * @OA\Put(

@@ -21,10 +21,16 @@ export default function RootLayout() {
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="auth" />
-        <Stack.Screen name="delivery" />
-        <Stack.Screen name="property" />
-        <Stack.Screen name="booking" />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="auth/login" />
+        <Stack.Screen name="auth/register" />
+        <Stack.Screen name="delivery/set-locations" />
+        <Stack.Screen name="delivery/order-details" />
+        <Stack.Screen name="delivery/finding-driver" />
+        <Stack.Screen name="delivery/live-tracking" />
+        <Stack.Screen name="property/details/[id]" />
+        <Stack.Screen name="booking/details/[id]" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="+not-found" />
       </Stack>

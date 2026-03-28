@@ -45,13 +45,11 @@ class BookingController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
         $validatedData = $validator->validated();
         $property = Property::find($validatedData['property_id']);
-
-        // Advanced validation: In a real app, you must check here for booking overlaps to prevent double booking.
 
         $checkIn = new \DateTime($validatedData['check_in_date']);
         $checkOut = new \DateTime($validatedData['check_out_date']);
@@ -65,10 +63,16 @@ class BookingController extends Controller
             'check_in_date' => $validatedData['check_in_date'],
             'check_out_date' => $validatedData['check_out_date'],
             'total_price' => $totalPrice,
-            'status' => 'pending', // Becomes 'confirmed' after successful payment
+            'status' => 'pending',
         ]);
 
-        return response()->json(compact('booking'), 201);
+        $booking->load('property:id,name,quarter,price_per_night');
+
+        return response()->json([
+            'success' => true,
+            'data' => $booking,
+            'message' => 'Booking created successfully.',
+        ], 201);
     }
 
     /**
@@ -95,11 +99,54 @@ class BookingController extends Controller
 
         if ($user->type === 'host') {
             $propertyIds = $user->properties()->pluck('id');
-            $bookings = Booking::whereIn('property_id', $propertyIds)->with('customer:id,name', 'property:id,name')->latest()->get();
+            $bookings = Booking::whereIn('property_id', $propertyIds)->with('customer:id,name', 'property:id,name,quarter,price_per_night')->latest()->get();
         } else {
-            $bookings = $user->bookings()->with('property:id,name')->latest()->get();
+            $bookings = $user->bookings()->with('property:id,name,quarter,price_per_night')->latest()->get();
         }
 
-        return response()->json(compact('bookings'));
+        return response()->json([
+            'success' => true,
+            'data' => $bookings,
+        ]);
+    }
+
+    /**
+     * Get a specific booking.
+     */
+    public function show($id)
+    {
+        $booking = Booking::with('property', 'customer:id,name')->findOrFail($id);
+
+        if (Auth::id() !== $booking->customer_id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $booking,
+        ]);
+    }
+
+    /**
+     * Cancel a booking.
+     */
+    public function cancel($id)
+    {
+        $booking = Booking::findOrFail($id);
+
+        if (Auth::id() !== $booking->customer_id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        if (!in_array($booking->status, ['pending', 'confirmed'])) {
+            return response()->json(['success' => false, 'message' => 'Booking cannot be cancelled'], 400);
+        }
+
+        $booking->update(['status' => 'cancelled']);
+        return response()->json([
+            'success' => true,
+            'data' => $booking,
+            'message' => 'Booking cancelled successfully.',
+        ]);
     }
 }

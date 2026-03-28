@@ -19,8 +19,8 @@ return new class extends Migration
             $table->date('check_in_date');
             $table->date('check_out_date');
             $table->decimal('total_price', 10, 2);
-            $table->enum('status', ['pending', 'confirmed', 'cancelled', 'completed'])->default('pending');
-            $table->enum('payment_status', enum_to_string_array(PaymentStatusEnum::cases()))->default(PaymentStatusEnum::PENDING->value);           $table->timestamps();
+            $table->string('status')->default('pending');
+            $table->string('payment_status')->default('PENDING');           $table->timestamps();
         });
     }
 
